@@ -1,6 +1,7 @@
 ﻿#include "optional.h"
 
 #include <cassert>
+#include <memory>
 
 struct C {
 	C() noexcept {
@@ -71,8 +72,8 @@ void TestInitialization() {
 		C c;
 		Optional<C> o(std::move(c));
 		assert(o.HasValue());
-		assert(C::def_ctor == 1 && C::move_ctor == 1 && C::copy_ctor == 0 &&
-			   C::copy_assign == 0 && C::move_assign == 0);
+		assert(C::def_ctor == 1 && C::move_ctor == 1 && C::copy_ctor == 0 && C::copy_assign == 0
+			   && C::move_assign == 0);
 		assert(C::InstanceCount() == 2);
 	}
 	assert(C::InstanceCount() == 0);
@@ -84,8 +85,8 @@ void TestInitialization() {
 		const Optional<C> o2(o1);
 		assert(o1.HasValue());
 		assert(o2.HasValue());
-		assert(C::def_ctor == 1 && C::move_ctor == 0 && C::copy_ctor == 2 &&
-			   C::copy_assign == 0 && C::move_assign == 0);
+		assert(C::def_ctor == 1 && C::move_ctor == 0 && C::copy_ctor == 2 && C::copy_assign == 0
+			   && C::move_assign == 0);
 		assert(C::InstanceCount() == 3);
 	}
 	assert(C::InstanceCount() == 0);
@@ -95,8 +96,8 @@ void TestInitialization() {
 		C c;
 		Optional<C> o1(c);
 		const Optional<C> o2(std::move(o1));
-		assert(C::def_ctor == 1 && C::copy_ctor == 1 && C::move_ctor == 1 &&
-			   C::copy_assign == 0 && C::move_assign == 0);
+		assert(C::def_ctor == 1 && C::copy_ctor == 1 && C::move_ctor == 1 && C::copy_assign == 0
+			   && C::move_assign == 0);
 		assert(C::InstanceCount() == 3);
 	}
 	assert(C::InstanceCount() == 0);
@@ -116,12 +117,12 @@ void TestAssignment() {
 		o2 = o1;
 		assert(C::copy_ctor == 1 && C::copy_assign == 0 && C::dtor == 0);
 	}
-	{  // Assign non empty to non-empty
+	{  // Assign non-empty to non-empty
 		C::Reset();
 		o2 = o1;
 		assert(C::copy_ctor == 0 && C::copy_assign == 1 && C::dtor == 0);
 	}
-	{  // Assign empty to non empty
+	{  // Assign empty to non-empty
 		C::Reset();
 		Optional<C> empty;
 		o1 = empty;
@@ -145,20 +146,19 @@ void TestMoveAssignment() {
 		o1 = std::move(o2);
 		assert(C::move_ctor == 1 && C::move_assign == 0 && C::dtor == 0);
 	}
-	{  // Assign non empty to non-empty
+	{  // Assign non-empty to non-empty
 		Optional<C> o1{C{}};
 		Optional<C> o2{C{}};
 		C::Reset();
 		o2 = std::move(o1);
 		assert(C::copy_ctor == 0 && C::move_assign == 1 && C::dtor == 0);
 	}
-	{  // Assign empty to non empty
+	{  // Assign empty to non-empty
 		Optional<C> o1{C{}};
 		C::Reset();
 		Optional<C> empty;
 		o1 = std::move(empty);
-		assert(C::copy_ctor == 0 && C::move_ctor == 0 && C::move_assign == 0 &&
-			   C::dtor == 1);
+		assert(C::copy_ctor == 0 && C::move_ctor == 0 && C::move_assign == 0 && C::dtor == 1);
 		assert(!o1.HasValue());
 	}
 }
@@ -195,44 +195,27 @@ void TestReset() {
 	}
 }
 
-void TestDestructor() {
-	{ // empty move
-		Optional<C> c;
-		C::Reset();
+void TestEmplace() {
+	struct S {
+		S(int i, std::unique_ptr<int>&& p)
+			: i(i)
+			, p(std::move(p))  //
 		{
-			Optional<C> o(std::move(c));
-			assert(C::def_ctor == 0u);
-			assert(C::copy_ctor == 0u);
-			assert(C::move_ctor == 0u);
-			assert(C::copy_assign == 0u);
-			assert(C::move_assign == 0u);
-			assert(C::dtor == 0u);
 		}
-		assert(C::def_ctor == 0u);
-		assert(C::copy_ctor == 0u);
-		assert(C::move_ctor == 0u);
-		assert(C::copy_assign == 0u);
-		assert(C::move_assign == 0u);
-		assert(C::dtor == 0u);
-	} { // non-empty move
-		Optional<C> c(C{});
-		C::Reset();
-		{
-			Optional<C> o(std::move(c));
-			assert(C::def_ctor == 0u);
-			assert(C::copy_ctor == 0u);
-			assert(C::move_ctor == 1u);
-			assert(C::copy_assign == 0u);
-			assert(C::move_assign == 0u);
-			assert(C::dtor == 0u);
-		}
-		assert(C::def_ctor == 0u);
-		assert(C::copy_ctor == 0u);
-		assert(C::move_ctor == 1u);
-		assert(C::copy_assign == 0u);
-		assert(C::move_assign == 0u);
-		assert(C::dtor == 1u);
-	}
+		int i;
+		std::unique_ptr<int> p;
+	};
+
+	Optional<S> o;
+	o.Emplace(1, std::make_unique<int>(2));
+	assert(o.HasValue());
+	assert(o->i == 1);
+	assert(*(o->p) == 2);
+
+	o.Emplace(3, std::make_unique<int>(4));
+	assert(o.HasValue());
+	assert(o->i == 3);
+	assert(*(o->p) == 4);
 }
 
 int main() {
@@ -242,7 +225,7 @@ int main() {
 		TestMoveAssignment();
 		TestValueAccess();
 		TestReset();
-		TestDestructor();
+		TestEmplace();
 	} catch (...) {
 		assert(false);
 	}

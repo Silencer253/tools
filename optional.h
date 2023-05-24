@@ -15,6 +15,15 @@ public:
 
 template <typename T>
 class Optional {
+private:
+
+	template <class... Args>
+	void initialize(Args&&... args) noexcept(noexcept(T(std::forward<Args>(args)...)))
+	{
+		::new (static_cast<void*>(data_)) T(std::forward<Args>(args)...);
+		is_initialized_ = true;
+	}
+
 public:
 	Optional() = default;
 	Optional(const T& value)
@@ -184,6 +193,14 @@ public:
 			Value().~T();
 		}
 		is_initialized_ = false;
+	}
+
+
+	template <class... Args>
+	void Emplace(Args&&... args)
+	{
+		Reset();
+		initialize(std::forward<Args>(args)...);
 	}
 
 private:
